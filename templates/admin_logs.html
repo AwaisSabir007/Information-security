@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Admin Logs | Secure Chat{% endblock %}
+{% block content %}
+<h2 class="mb-4">System Logs</h2>
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title">Login Attempts</h4>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Success</th>
+                <th>IP</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+              <tr>
+                <td>{{ attempt.username }}</td>
+                <td>
+                  <span class="badge {% if attempt.success %}bg-success{% else %}bg-danger{% endif %}">
+                    {{ 'Yes' if attempt.success else 'No' }}
+                  </span>
+                </td>
+                <td>{{ attempt.ip_address or 'N/A' }}</td>
+                <td>{{ attempt.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title">Brute Force Logs</h4>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Attempts</th>
+                <th>Duration (ms)</th>
+                <th>Result</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in brute_logs %}
+              <tr>
+                <td>{{ log.attack_type }}</td>
+                <td>{{ log.attempts }}</td>
+                <td>{{ log.duration_ms|round(2) }}</td>
+                <td>{{ log.result }}</td>
+                <td>{{ log.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

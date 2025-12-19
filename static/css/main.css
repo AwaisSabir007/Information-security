@@ -1,0 +1,29 @@
+body {
+  background-color: #f5f6fa;
+}
+
+.chat-window {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  height: 50vh;
+  overflow-y: auto;
+}
+
+.chat-message {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.chat-message.me {
+  background-color: #d1e7dd;
+  align-self: flex-end;
+}
+
+.chat-message.partner {
+  background-color: #e2e3e5;
+  align-self: flex-start;
+}
+

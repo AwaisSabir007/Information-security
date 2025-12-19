@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secure Chat Contacts</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600&display=swap" rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2463eb",
+            "background-light": "#f6f6f8",
+            "background-dark": "#111621",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"],
+            "heading": ["Poppins", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="font-display bg-background-light text-[#1a1a1a]">
+  <div class="flex flex-col min-h-screen">
+    <header class="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-heading text-lg">SC</div>
+        <div>
+          <p class="text-sm text-gray-500">Secure Chat</p>
+          <h1 class="text-xl font-semibold">Contacts</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="{{ url_for('brute_force_home') }}" class="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold hover:bg-blue-600">Brute Force Lab</a>
+        <a href="{{ url_for('admin_logs') }}" class="text-sm text-gray-600 hover:text-primary">Admin Logs</a>
+        <a href="{{ url_for('logout') }}" class="text-sm text-gray-600 hover:text-primary">Logout</a>
+      </div>
+    </header>
+
+    <main class="flex-1 flex">
+      <section class="w-full max-w-sm border-r border-gray-200 bg-white">
+        <div class="p-4 border-b border-gray-100">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="mb-3 rounded-lg border px-3 py-2 text-sm {% if category == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-blue-200 bg-blue-50 text-blue-700{% endif %}">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+          <label class="flex flex-col">
+            <span class="text-sm font-medium text-gray-500 mb-2">Search members</span>
+            <input class="form-input rounded-full border-gray-200 focus:border-primary focus:ring-primary" placeholder="Search (coming soon)" disabled />
+          </label>
+        </div>
+        <div class="divide-y divide-gray-100">
+          {% if users %}
+            {% for user in users %}
+              <a href="{{ url_for('chat', username=user.username) }}" class="flex items-center gap-3 px-4 py-4 hover:bg-gray-50">
+                <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-heading uppercase">
+                  {{ user.username[:2] }}
+                </div>
+                <div class="flex-1">
+                  <p class="text-base font-semibold text-gray-900">{{ user.username }}</p>
+                  <p class="text-sm text-gray-500">Tap to open secure chat</p>
+                </div>
+                <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+              </a>
+            {% endfor %}
+          {% else %}
+            <div class="p-6 text-center text-gray-500">
+              No other users yet. Invite someone to register and start a secure chat.
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-white to-blue-50 text-center px-6">
+        <h2 class="text-2xl font-semibold mb-3">Select a contact</h2>
+        <p class="text-gray-600 max-w-md">
+          Choose a user on the left to start an end-to-end encrypted conversation. Messages will appear here with the modern layout once a chat is active.
+        </p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
+

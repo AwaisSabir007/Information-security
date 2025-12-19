@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Brute Force Lab | Secure Chat{% endblock %}
+{% block content %}
+<h2 class="mb-4">Brute Force Lab</h2>
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h4 class="card-title">Password Hash Brute Force</h4>
+        <p class="text-muted small">Paste a bcrypt hash and provide dictionary words. The system will simulate a dictionary attack.</p>
+        <form method="post" action="{{ url_for('brute_force_password') }}">
+          <div class="mb-3">
+            <label class="form-label">Bcrypt Hash</label>
+            <input type="text" class="form-control" name="bcrypt_hash" placeholder="$2b$12$..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Dictionary Words (one per line)</label>
+            <textarea class="form-control" name="dictionary" rows="6" placeholder="password123&#10;letmein&#10;secret" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-danger w-100">Run Dictionary Attack</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h4 class="card-title">AES Key Brute Force Simulation</h4>
+        <p class="text-muted small">Uses a tiny key-space (default 16-bit) to show how quickly a smaller AES key can be brute-forced.</p>
+        <form method="post" action="{{ url_for('brute_force_key') }}">
+          <div class="mb-3">
+            <label class="form-label">Plaintext</label>
+            <input type="text" class="form-control" name="plaintext" value="Confidential" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bit Size (4 - 24)</label>
+            <input type="number" class="form-control" name="bit_size" min="4" max="24" value="16" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Known Key (optional)</label>
+            <input type="number" class="form-control" name="known_key" placeholder="42">
+          </div>
+          <button type="submit" class="btn btn-warning w-100">Simulate Brute Force</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

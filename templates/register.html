@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Create an Account - SecureChat</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Poppins:wght@600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24
+    }
+  </style>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2563eb",
+            "primary-accent": "#1e40af",
+            "background-light": "#f5f6fa",
+            "background-dark": "#111621",
+            "text-light": "#1a1a1a",
+            "text-dark": "#f5f6fa",
+            "subtle-text": "#6b7280",
+            "error": "#ef4444"
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"],
+            "heading": ["Poppins", "sans-serif"],
+          },
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "0.75rem",
+            "xl": "1rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-text-light dark:text-text-dark">
+  <div class="relative flex min-h-screen w-full flex-col items-center justify-center p-4">
+    <header class="absolute top-0 left-0 right-0 flex items-center justify-center p-6">
+      <div class="flex items-center gap-3 text-text-light dark:text-text-dark">
+        <div class="text-primary w-7 h-7">
+          <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path d="M44 11.2727C44 14.0109 39.8386 16.3957 33.69 17.6364C39.8386 18.877 44 21.2618 44 24C44 26.7382 39.8386 29.123 33.69 30.3636C39.8386 31.6043 44 33.9891 44 36.7273C44 40.7439 35.0457 44 24 44C12.9543 44 4 40.7439 4 36.7273C4 33.9891 8.16144 31.6043 14.31 30.3636C8.16144 29.123 4 26.7382 4 24C4 21.2618 8.16144 18.877 14.31 17.6364C8.16144 16.3957 4 14.0109 4 11.2727C4 7.25611 12.9543 4 24 4C35.0457 4 44 7.25611 44 11.2727Z" fill="currentColor"></path>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold leading-tight tracking-tight font-heading">SecureChat</h2>
+      </div>
+    </header>
+
+    <main class="w-full max-w-md">
+      <div class="bg-white dark:bg-background-dark/50 rounded-xl shadow-lg p-8 mt-10">
+        <div class="text-center mb-8">
+          <h1 class="text-3xl font-bold leading-tight font-heading">Create an Account</h1>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+            <div class="mb-4 rounded-md border-l-4 px-4 py-3 {% if category == 'danger' %}bg-error/10 border-error text-error{% elif category == 'success' %}bg-green-500/10 border-green-500 text-green-700 dark:text-green-300{% else %}bg-primary/10 border-primary text-primary-accent{% endif %}">
+              {{ message }}
+            </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="post" class="space-y-6">
+          <div>
+            <label class="block text-sm font-medium leading-normal pb-2" for="username">Username</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-subtle-text">
+                <span class="material-symbols-outlined">person</span>
+              </span>
+              <input
+                class="form-input flex w-full rounded-lg bg-background-light dark:bg-background-dark/70 text-text-light dark:text-text-dark focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbdee6] dark:border-gray-700 h-12 placeholder:text-subtle-text px-10 py-2 text-base"
+                id="username"
+                name="username"
+                placeholder="Enter your username"
+                type="text"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium leading-normal pb-2" for="password">Password</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-subtle-text">
+                <span class="material-symbols-outlined">lock</span>
+              </span>
+              <input
+                class="form-input flex w-full rounded-lg bg-background-light dark:bg-background-dark/70 text-text-light dark:text-text-dark focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbdee6] dark:border-gray-700 h-12 placeholder:text-subtle-text px-10 py-2 text-base"
+                id="password"
+                name="password"
+                placeholder="Enter your password"
+                type="password"
+                minlength="8"
+                required
+              />
+              <button class="absolute inset-y-0 right-0 flex items-center pr-3 text-subtle-text" type="button">
+                <span class="material-symbols-outlined">visibility_off</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium leading-normal pb-2" for="confirm_password">Confirm Password</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-subtle-text">
+                <span class="material-symbols-outlined">lock</span>
+              </span>
+              <input
+                class="form-input flex w-full rounded-lg bg-background-light dark:bg-background-dark/70 text-text-light dark:text-text-dark focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#dbdee6] dark:border-gray-700 h-12 placeholder:text-subtle-text px-10 py-2 text-base"
+                id="confirm_password"
+                name="confirm_password"
+                placeholder="Confirm your password"
+                type="password"
+                minlength="8"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="bg-primary/10 border-l-4 border-primary/50 text-primary-accent dark:text-blue-300 p-4 rounded-md text-sm">
+            <p>Password must be at least 8 characters long and include a number and a special character.</p>
+          </div>
+
+          <div>
+            <button class="flex w-full items-center justify-center rounded-lg bg-primary h-12 px-6 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2" type="submit">
+              Create Account
+            </button>
+          </div>
+        </form>
+
+        <div class="mt-6 text-center">
+          <p class="text-sm text-subtle-text">
+            Already have an account?
+            <a class="font-medium text-primary hover:text-primary-accent" href="{{ url_for('login') }}">Login</a>
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
+
