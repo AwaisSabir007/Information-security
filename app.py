@@ -133,6 +133,12 @@ def register_routes(app: Flask) -> None:
                 flash("Password must be at least 8 characters long.", "danger")
                 return redirect(url_for("register"))
 
+            # Check for special characters
+            special_characters = set("!@#$%^&*()-_=+[]{}|;:,.<>?/")
+            if not any(char in special_characters for char in password):
+                flash("Password must contain at least one special character (e.g., ! @ # $).", "danger")
+                return redirect(url_for("register"))
+
             hashed = hashing.hash_password(password)
             key_pair = key_exchange.generate_key_pair()
 
@@ -378,6 +384,44 @@ def register_routes(app: Flask) -> None:
         attempts = LoginAttempt.query.order_by(LoginAttempt.created_at.desc()).limit(50).all()
         brute_logs = BruteForceLog.query.order_by(BruteForceLog.created_at.desc()).limit(50).all()
         return render_template("admin_logs.html", attempts=attempts, brute_logs=brute_logs)
+
+    @app.route("/hacker/dashboard")
+    @login_required
+    def hacker_dashboard():
+        """Render the Hacker View dashboard."""
+        return render_template("hacker_dashboard.html")
+
+    @app.route("/api/sniffer")
+    @login_required
+    def api_sniffer():
+        """API to return the latest encrypted messages for the sniffer view."""
+        # Fetch the last 20 messages from all users
+        messages = (
+            Message.query.order_by(Message.timestamp.desc())
+            .limit(20)
+            .all()
+        )
+        
+        packet_data = []
+        for msg in messages:
+            # Note: msg.encrypted_message is already the base64 string in the DB.
+            # We don't need to decode it to bytes just to display it.
+            # Ideally we show the raw ciphertext, but for the "hacker view" the base64 string is perfect.
+            
+            packet_data.append({
+                "id": msg.id,
+                "timestamp": msg.timestamp.strftime("%H:%M:%S"),
+                "source_ip": "192.168.1." + str(100 + msg.sender_id), 
+                "dest_ip": "192.168.1." + str(100 + msg.receiver_id),
+                "protocol": "TLSv1.3",
+                "length": len(msg.encrypted_message),
+                "encrypted_payload": msg.encrypted_message[:50] + "...",
+                "iv": msg.iv[:20] + "..." if msg.iv else "",
+                "hmac": msg.hmac[:20] + "..." if msg.hmac else "",
+                "type": "ENCRYPTED_DATA"
+            })
+            
+        return jsonify(packet_data)
 
 
 def _mini_aes_key(key: int) -> bytes:

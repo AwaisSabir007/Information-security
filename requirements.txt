@@ -8,4 +8,5 @@ PyMySQL==1.1.1
 bcrypt==4.2.0
 pycryptodome==3.20.0
 requests==2.32.3
+pytest==8.3.4
 

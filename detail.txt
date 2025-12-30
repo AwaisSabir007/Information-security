@@ -1,0 +1,935 @@
+# 🔐 SECURE END-TO-END ENCRYPTED CHAT - DETAILED PROJECT FLOW DOCUMENTATION
+
+
+## 📋 TABLE OF CONTENTS
+1. System Architecture Overview
+2. Project Flow Diagrams
+3. Complete User Journey Examples
+4. Backend Processing Details
+5. Database Interactions
+6. Security Mechanisms
+
+---
+
+## 1. SYSTEM ARCHITECTURE OVERVIEW
+
+### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER BROWSER                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  HTML/CSS    │  │  JavaScript  │  │  Bootstrap   │          │
+│  │  Templates   │  │  (chat.js)   │  │  UI          │          │
+│  └──────┬───────┘  └──────┬───────┘  └──────────────┘          │
+│         │                  │                                      │
+│         └──────────────────┴─── AJAX Polling (2 sec) ───────────┤
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      FLASK APPLICATION                           │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                      app.py (Routes)                      │  │
+│  │  /register  /login  /chat  /send_message  /get_messages  │  │
+│  └────┬─────────────────────────────────────────────┬────────┘  │
+│       │                                              │            │
+│  ┌────▼──────────────┐                    ┌─────────▼─────────┐ │
+│  │  Authentication   │                    │  Message Handler  │ │
+│  │  - Session Mgmt   │                    │  - Encrypt/Decrypt│ │
+│  │  - Rate Limiting  │                    │  - Key Exchange   │ │
+│  └────┬──────────────┘                    └─────────┬─────────┘ │
+└───────┼──────────────────────────────────────────────┼──────────┘
+        │                                              │
+        ▼                                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    CRYPTO MODULES                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  hashing.py  │  │ encryption.py│  │key_exchange.py│          │
+│  │  (bcrypt)    │  │ (AES-256 CBC)│  │(Diffie-Hellman)│         │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    DATABASE LAYER (SQLite)                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  ┌─────────────┐│
+│  │  Users   │  │ Messages │  │LoginAttempts │  │BruteForce   ││
+│  │  Table   │  │  Table   │  │   Table      │  │Logs Table   ││
+│  └──────────┘  └──────────┘  └──────────────┘  └─────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Component Breakdown
+
+**Frontend Layer:**
+- HTML Templates (Jinja2): base.html, login.html, register.html, chat.html, chat_list.html
+- JavaScript: chat.js (AJAX polling, message rendering)
+- CSS: Bootstrap + custom styles
+
+**Backend Layer:**
+- Flask Application (app.py): 402 lines, 25 functions
+- Configuration (config.py): Environment settings, security configs
+- Routes: 11 endpoints for authentication, messaging, admin
+
+**Cryptography Layer:**
+- encryption.py: AES-256 CBC with HMAC-SHA256
+- hashing.py: bcrypt password hashing
+- key_exchange.py: Diffie-Hellman 2048-bit
+- utils.py: HKDF, HMAC, Base64 encoding
+
+**Database Layer:**
+- SQLAlchemy ORM
+- 4 Models: User, Message, LoginAttempt, BruteForceLog
+- SQLite database (secure_chat.db)
+
+---
+
+## 2. PROJECT FLOW DIAGRAMS
+
+### 2.1 Complete System Flow Diagram
+
+```mermaid
+graph TB
+    Start([User Opens Browser]) --> CheckSession{Session<br/>Exists?}
+    CheckSession -->|No| ShowLogin[Show Login Page]
+    CheckSession -->|Yes| ShowChatList[Show Chat List]
+    
+    ShowLogin --> UserAction{User<br/>Action?}
+    UserAction -->|Register| RegForm[Fill Registration Form]
+    UserAction -->|Login| LoginForm[Fill Login Form]
+    
+    RegForm --> ValidateReg{Valid<br/>Input?}
+    ValidateReg -->|No| RegError[Show Error]
+    RegError --> RegForm
+    ValidateReg -->|Yes| HashPass[Hash Password with bcrypt]
+    HashPass --> GenKeys[Generate DH Key Pair]
+    GenKeys --> SaveUser[Save to Database]
+    SaveUser --> RedirectLogin[Redirect to Login]
+    RedirectLogin --> LoginForm
+    
+    LoginForm --> CheckLimit{Rate<br/>Limit OK?}
+    CheckLimit -->|No| Lockout[Show Lockout Message]
+    CheckLimit -->|Yes| VerifyPass{Password<br/>Correct?}
+    VerifyPass -->|No| LogFail[Log Failed Attempt]
+    LogFail --> LoginForm
+    VerifyPass -->|Yes| CreateSession[Create Flask Session]
+    CreateSession --> LogSuccess[Log Successful Login]
+    LogSuccess --> ShowChatList
+    
+    ShowChatList --> SelectUser[User Selects Chat Partner]
+    SelectUser --> LoadChat[Load Chat Interface]
+    LoadChat --> ComputeKey[Compute Shared DH Key]
+    ComputeKey --> FetchMsgs[Fetch Messages via AJAX]
+    FetchMsgs --> DecryptMsgs[Decrypt Each Message]
+    DecryptMsgs --> RenderChat[Render Chat Bubbles]
+    
+    RenderChat --> UserChatAction{User<br/>Action?}
+    UserChatAction -->|Type Message| SendMsg[Click Send Button]
+    UserChatAction -->|Wait| Poll[AJAX Poll Every 2s]
+    Poll --> FetchMsgs
+    
+    SendMsg --> EncryptMsg[Encrypt with AES-256]
+    EncryptMsg --> GenHMAC[Generate HMAC Tag]
+    GenHMAC --> SaveMsg[Save to Database]
+    SaveMsg --> RefreshChat[Refresh Messages]
+    RefreshChat --> RenderChat
+```
+
+### 2.2 Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Flask
+    participant Database
+    participant Crypto
+    
+    User->>Browser: Enter username & password
+    Browser->>Flask: POST /login
+    Flask->>Database: Query user by username
+    Database-->>Flask: Return user record
+    Flask->>Flask: Check rate limiting (5 attempts/5min)
+    Flask->>Crypto: verify_password(input, stored_hash)
+    Crypto-->>Flask: True/False
+    alt Password Correct
+        Flask->>Database: Log successful attempt
+        Flask->>Flask: Create session (user_id)
+        Flask-->>Browser: Redirect to /chat
+        Browser-->>User: Show chat list
+    else Password Wrong
+        Flask->>Database: Log failed attempt
+        Flask-->>Browser: Show error message
+        Browser-->>User: Display error
+    end
+```
+
+---
+
+## 3. COMPLETE USER JOURNEY EXAMPLES
+
+### Example 1: New User Registration
+
+**Step-by-Step Flow:**
+
+1. **User arrives at website** → `http://127.0.0.1:5000`
+   - Backend: `@app.route('/')` redirects to `/login`
+   - No session exists, so login page is shown
+
+2. **User clicks "Register"** → Navigates to `/register`
+   - Frontend: Displays register.html template
+   - Form fields: username, password, confirm_password
+
+3. **User fills form:**
+   - Username: "alice"
+   - Password: "SecurePass123"
+   - Confirm Password: "SecurePass123"
+
+4. **User clicks "Register" button**
+   - Frontend: POST request to `/register`
+   - Payload: `{username: "alice", password: "SecurePass123", confirm: "SecurePass123"}`
+
+5. **Backend Processing (`app.py` lines 120-156):**
+   ```
+   a. Validate input:
+      - Check username not empty
+      - Check password length >= 8
+      - Check passwords match
+      
+   b. Check username uniqueness:
+      - Query: SELECT * FROM users WHERE username='alice'
+      - If exists → Return error "Username already taken"
+      
+   c. Hash password:
+      - Call: hashing.hash_password("SecurePass123")
+      - bcrypt with 12 rounds (2^12 = 4096 iterations)
+      - Generates random salt automatically
+      - Returns: b'$2b$12$...' (60 bytes)
+      
+   d. Generate Diffie-Hellman key pair:
+      - Call: key_exchange.generate_key_pair()
+      - Private key: Random int in range [2, P-1]
+      - Public key: G^private mod P (2048-bit)
+      - Example:
+        * private_key: 123456789...
+        * public_key: 987654321...
+      
+   e. Save to database:
+      - INSERT INTO users (username, password_hash, public_key, private_key)
+      - VALUES ('alice', b'$2b$12$...', '987654321...', '123456789...')
+      
+   f. Redirect to login page
+   ```
+
+6. **User sees success message** → "Registration successful! Please login."
+
+---
+
+### Example 2: User Login Process
+
+**User: alice**
+**Password: SecurePass123**
+
+1. **User enters credentials** on `/login` page
+
+2. **User clicks "Login"**
+   - Frontend: POST to `/login`
+   - Payload: `{username: "alice", password: "SecurePass123"}`
+
+3. **Backend Processing (`app.py` lines 158-193):**
+   ```
+   a. Get client IP address:
+      - IP: request.remote_addr → "127.0.0.1"
+      
+   b. Check rate limiting:
+      - Query last 5 minutes of login attempts for "alice"
+      - Count failed attempts
+      - If >= 5 failures → Return "Account locked for 60 seconds"
+      
+   c. Fetch user from database:
+      - Query: SELECT * FROM users WHERE username='alice'
+      - Returns: User object with id=1, password_hash=b'$2b$12$...'
+      
+   d. Verify password:
+      - Call: hashing.verify_password("SecurePass123", stored_hash)
+      - bcrypt.checkpw() performs constant-time comparison
+      - Returns: True
+      
+   e. Create Flask session:
+      - session['user_id'] = 1
+      - Session stored in encrypted cookie (SECRET_KEY)
+      
+   f. Log successful attempt:
+      - INSERT INTO login_attempts (username, success, ip_address)
+      - VALUES ('alice', True, '127.0.0.1')
+      
+   g. Redirect to /chat
+   ```
+
+4. **User sees chat list** with all registered users
+
+---
+
+### Example 3: Sending an Encrypted Message
+
+**Scenario:**
+- Sender: alice (user_id=1)
+- Receiver: bob (user_id=2)
+- Message: "Hello Bob! How are you?"
+
+**Complete Flow:**
+
+1. **Alice selects Bob from chat list**
+   - Frontend: Clicks on Bob's card
+   - Navigates to `/chat/bob`
+
+2. **Backend initializes chat (`app.py` lines 208-221):**
+   ```
+   a. Verify alice is logged in:
+      - Check session['user_id'] exists
+      
+   b. Fetch both users:
+      - alice = User.query.filter_by(username='alice').first()
+      - bob = User.query.filter_by(username='bob').first()
+      
+   c. Compute shared encryption key:
+      - Call: get_shared_key_for_users(alice, bob)
+      
+      Process:
+      1. Create session key identifier:
+         - user_ids = sorted([1, 2]) → [1, 2]
+         - session_key = "shared_key_1_2"
+      
+      2. Check if key already cached:
+         - if session_key in session → return cached key
+      
+      3. Compute Diffie-Hellman shared secret:
+         - alice_private = int(alice.private_key)
+         - bob_public = int(bob.public_key)
+         - shared_secret = pow(bob_public, alice_private, P)
+         - This equals: pow(alice_public, bob_private, P)
+      
+      4. Derive AES-256 key using HKDF:
+         - Call: hkdf_sha256(shared_secret)
+         - Extract: HMAC-SHA256(salt, shared_secret)
+         - Expand: HMAC-SHA256(extract, info)
+         - Returns: 32-byte AES key
+      
+      5. Cache in session:
+         - session['shared_key_1_2'] = base64(aes_key)
+      
+   d. Render chat.html template
+   ```
+
+3. **Frontend loads chat interface:**
+   ```javascript
+   // chat.js starts
+   - Fetch initial messages: GET /get_messages/bob
+   - Start polling: setInterval(fetchMessages, 2000)
+   ```
+
+4. **Alice types message and clicks Send:**
+   - Input: "Hello Bob! How are you?"
+   - Frontend: POST to `/send_message`
+   - Payload: `{receiver: "bob", message: "Hello Bob! How are you?"}`
+
+5. **Backend encrypts and stores (`app.py` lines 223-251):**
+   ```
+   a. Validate input:
+      - Check message not empty
+      - Check receiver exists
+      
+   b. Get shared key from session:
+      - shared_key = session['shared_key_1_2']
+      - Decode from base64 to bytes (32 bytes)
+      
+   c. Encrypt message (encryption.py):
+      1. Generate random IV:
+         - iv = get_random_bytes(16)
+         - Example: b'\x1a\x2b\x3c\x4d...'
+      
+      2. Pad plaintext (PKCS#7):
+         - plaintext = "Hello Bob! How are you?"
+         - plaintext_bytes = b'Hello Bob! How are you?'
+         - Length: 23 bytes
+         - Padding needed: 16 - (23 % 16) = 9 bytes
+         - Padded: b'Hello Bob! How are you?\x09\x09\x09\x09\x09\x09\x09\x09\x09'
+      
+      3. Encrypt with AES-256 CBC:
+         - cipher = AES.new(shared_key, AES.MODE_CBC, iv)
+         - ciphertext = cipher.encrypt(padded)
+         - Result: b'\x7f\x8a\x9b...' (32 bytes)
+      
+      4. Generate HMAC tag:
+         - data = iv + ciphertext (48 bytes)
+         - hmac_tag = HMAC-SHA256(shared_key, data)
+         - Result: 32-byte tag
+      
+      5. Create EncryptedPayload:
+         - payload = EncryptedPayload(ciphertext, iv, hmac_tag)
+      
+   d. Encode to Base64 for storage:
+      - ciphertext_b64 = base64.b64encode(ciphertext)
+      - iv_b64 = base64.b64encode(iv)
+      - hmac_b64 = base64.b64encode(hmac_tag)
+      
+   e. Save to database:
+      - INSERT INTO messages (sender_id, receiver_id, encrypted_message, iv, hmac)
+      - VALUES (1, 2, 'ciphertext_b64', 'iv_b64', 'hmac_b64')
+      
+   f. Return success: {status: "success"}
+   ```
+
+6. **Frontend receives response:**
+   - Clears input field
+   - Calls fetchMessages() to refresh chat
+
+---
+
+### Example 4: Receiving and Decrypting Messages
+
+**Bob's perspective:**
+
+1. **Bob opens chat with Alice** → `/chat/alice`
+
+2. **JavaScript polls for messages:**
+   ```javascript
+   // Every 2 seconds
+   fetch('/get_messages/alice')
+   ```
+
+3. **Backend fetches and decrypts (`app.py` lines 253-293):**
+   ```
+   a. Get current user (Bob, id=2) from session
+   
+   b. Get chat partner (Alice, id=1) from URL
+   
+   c. Compute shared key:
+      - Same process as before
+      - Both Alice and Bob compute identical key
+      
+   d. Query all messages between them:
+      - Query: SELECT * FROM messages 
+        WHERE (sender_id=1 AND receiver_id=2) 
+           OR (sender_id=2 AND receiver_id=1)
+        ORDER BY timestamp ASC
+      
+   e. Decrypt each message:
+      For message with id=1:
+      
+      1. Decode from Base64:
+         - ciphertext = base64.b64decode(msg.encrypted_message)
+         - iv = base64.b64decode(msg.iv)
+         - hmac_tag = base64.b64decode(msg.hmac)
+      
+      2. Create EncryptedPayload:
+         - payload = EncryptedPayload(ciphertext, iv, hmac_tag)
+      
+      3. Verify HMAC (CRITICAL SECURITY STEP):
+         - computed_hmac = HMAC-SHA256(shared_key, iv + ciphertext)
+         - if computed_hmac != hmac_tag:
+             → REJECT MESSAGE (tampered!)
+         - This prevents: tampering, bit-flipping attacks
+      
+      4. Decrypt with AES-256 CBC:
+         - cipher = AES.new(shared_key, AES.MODE_CBC, iv)
+         - padded_plaintext = cipher.decrypt(ciphertext)
+      
+      5. Remove PKCS#7 padding:
+         - Last byte indicates padding length
+         - plaintext = padded_plaintext[:-padding_length]
+         - Result: "Hello Bob! How are you?"
+      
+      6. Add to response array:
+         - {
+             sender: "alice",
+             receiver: "bob",
+             content: "Hello Bob! How are you?",
+             timestamp: "2025-12-21T12:00:00"
+           }
+   
+   f. Return JSON array of decrypted messages
+   ```
+
+4. **Frontend renders messages:**
+   ```javascript
+   - Creates chat bubbles
+   - Different styling for sent vs received
+   - Groups by date
+   - Auto-scrolls to bottom
+   ```
+
+---
+
+## 4. BACKEND PROCESSING DETAILS
+
+### 4.1 Key Exchange Mechanism (Diffie-Hellman)
+
+**Mathematical Foundation:**
+
+```
+Public Parameters:
+- P = 2048-bit prime (RFC 3526)
+- G = 2 (generator)
+
+Alice's Keys:
+- Private: a (random, secret)
+- Public: A = G^a mod P
+
+Bob's Keys:
+- Private: b (random, secret)
+- Public: B = G^b mod P
+
+Shared Secret Computation:
+- Alice computes: S = B^a mod P
+- Bob computes: S = A^b mod P
+- Both get same S because: (G^b)^a = (G^a)^b = G^(ab) mod P
+
+Key Derivation:
+- AES_KEY = HKDF-SHA256(S)
+```
+
+**Code Implementation:**
+
+```python
+# key_exchange.py
+
+def generate_key_pair():
+    private = secrets.randbelow(P - 2) + 2  # Random in [2, P-1]
+    public = pow(G, private, P)              # G^private mod P
+    return KeyPair(private, public)
+
+def compute_shared_key(my_private, peer_public):
+    shared_secret = pow(peer_public, my_private, P)  # peer_pub^my_priv mod P
+    return hkdf_sha256(shared_secret)                # Derive 32-byte AES key
+```
+
+**Security Properties:**
+- Computational Diffie-Hellman assumption
+- 2048-bit provides ~112-bit security
+- Resistant to passive eavesdropping
+- Vulnerable to MITM (no authentication) - acceptable for educational project
+
+---
+
+### 4.2 Message Encryption Process
+
+**Encryption Pipeline:**
+
+```
+Plaintext → UTF-8 Encode → PKCS#7 Pad → AES-256 CBC Encrypt → Generate HMAC → Store
+```
+
+**Detailed Steps:**
+
+1. **Input Validation:**
+   - Check message not empty
+   - Sanitize HTML (prevent XSS)
+
+2. **Encoding:**
+   ```python
+   plaintext_bytes = plaintext.encode('utf-8')
+   ```
+
+3. **Padding (PKCS#7):**
+   ```python
+   def _pad(data):
+       pad_len = 16 - (len(data) % 16)
+       return data + bytes([pad_len] * pad_len)
+   
+   # Example:
+   # Input: b'Hello' (5 bytes)
+   # Pad length: 16 - (5 % 16) = 11
+   # Output: b'Hello\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b'
+   ```
+
+4. **IV Generation:**
+   ```python
+   iv = get_random_bytes(16)  # Cryptographically secure random
+   ```
+
+5. **AES Encryption:**
+   ```python
+   cipher = AES.new(shared_key, AES.MODE_CBC, iv)
+   ciphertext = cipher.encrypt(padded_plaintext)
+   ```
+
+6. **HMAC Generation:**
+   ```python
+   tag = HMAC-SHA256(shared_key, iv + ciphertext)
+   ```
+
+7. **Base64 Encoding:**
+   ```python
+   encrypted_message = base64.b64encode(ciphertext).decode('ascii')
+   iv_b64 = base64.b64encode(iv).decode('ascii')
+   hmac_b64 = base64.b64encode(tag).decode('ascii')
+   ```
+
+---
+
+### 4.3 Message Decryption Process
+
+**Decryption Pipeline:**
+
+```
+Retrieve from DB → Base64 Decode → Verify HMAC → AES-256 CBC Decrypt → Remove Padding → UTF-8 Decode
+```
+
+**Detailed Steps:**
+
+1. **Retrieve from Database:**
+   ```sql
+   SELECT encrypted_message, iv, hmac FROM messages WHERE id=?
+   ```
+
+2. **Base64 Decode:**
+   ```python
+   ciphertext = base64.b64decode(encrypted_message)
+   iv = base64.b64decode(iv_b64)
+   hmac_tag = base64.b64decode(hmac_b64)
+   ```
+
+3. **HMAC Verification (CRITICAL):**
+   ```python
+   computed_hmac = HMAC-SHA256(shared_key, iv + ciphertext)
+   if not hmac.compare_digest(computed_hmac, hmac_tag):
+       raise ValueError("HMAC verification failed - message tampered!")
+   ```
+   - Uses constant-time comparison
+   - Prevents timing attacks
+   - Ensures message integrity
+
+4. **AES Decryption:**
+   ```python
+   cipher = AES.new(shared_key, AES.MODE_CBC, iv)
+   padded_plaintext = cipher.decrypt(ciphertext)
+   ```
+
+5. **Unpadding:**
+   ```python
+   def _unpad(data):
+       pad_len = data[-1]
+       if pad_len == 0 or pad_len > 16:
+           raise ValueError("Invalid padding")
+       return data[:-pad_len]
+   ```
+
+6. **UTF-8 Decode:**
+   ```python
+   plaintext = unpadded.decode('utf-8')
+   ```
+
+---
+
+## 5. DATABASE INTERACTIONS
+
+### 5.1 Database Schema with Relationships
+
+```
+┌─────────────────────────────────────────┐
+│              users                       │
+├─────────────────────────────────────────┤
+│ id (PK)          INTEGER                 │
+│ username         VARCHAR(80) UNIQUE      │
+│ password_hash    BLOB(128)               │
+│ public_key       TEXT                    │
+│ private_key      TEXT                    │
+│ created_at       DATETIME                │
+└──────────┬──────────────────────────────┘
+           │
+           │ 1:N (sender)
+           ├──────────────────────┐
+           │                      │
+           │ 1:N (receiver)       │
+           │                      │
+┌──────────▼──────────────────────▼───────┐
+│              messages                    │
+├─────────────────────────────────────────┤
+│ id (PK)              INTEGER             │
+│ sender_id (FK)       INTEGER             │
+│ receiver_id (FK)     INTEGER             │
+│ encrypted_message    TEXT                │
+│ iv                   TEXT                │
+│ hmac                 TEXT                │
+│ timestamp            DATETIME (indexed)  │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│          login_attempts                  │
+├─────────────────────────────────────────┤
+│ id (PK)          INTEGER                 │
+│ username         VARCHAR(80)             │
+│ success          BOOLEAN                 │
+│ ip_address       VARCHAR(64)             │
+│ created_at       DATETIME (indexed)      │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│        brute_force_logs                  │
+├─────────────────────────────────────────┤
+│ id (PK)          INTEGER                 │
+│ attack_type      VARCHAR(32)             │
+│ attempts         INTEGER                 │
+│ duration_ms      FLOAT                   │
+│ result           VARCHAR(32)             │
+│ created_at       DATETIME (indexed)      │
+└─────────────────────────────────────────┘
+```
+
+### 5.2 Key Database Operations
+
+**1. User Registration:**
+```python
+new_user = User(
+    username='alice',
+    password_hash=hashed_password,
+    public_key=str(key_pair.public_key),
+    private_key=str(key_pair.private_key)
+)
+db.session.add(new_user)
+db.session.commit()
+```
+
+**2. Message Storage:**
+```python
+message = Message(
+    sender_id=current_user.id,
+    receiver_id=receiver.id,
+    encrypted_message=payload.ciphertext_b64,
+    iv=payload.iv_b64,
+    hmac=payload.hmac_b64
+)
+db.session.add(message)
+db.session.commit()
+```
+
+**3. Fetching Messages:**
+```python
+messages = Message.query.filter(
+    db.or_(
+        db.and_(Message.sender_id == user1.id, Message.receiver_id == user2.id),
+        db.and_(Message.sender_id == user2.id, Message.receiver_id == user1.id)
+    )
+).order_by(Message.timestamp.asc()).all()
+```
+
+**4. Rate Limiting Check:**
+```python
+cutoff = datetime.utcnow() - timedelta(minutes=5)
+failed_attempts = LoginAttempt.query.filter(
+    LoginAttempt.username == username,
+    LoginAttempt.success == False,
+    LoginAttempt.created_at >= cutoff
+).count()
+
+if failed_attempts >= 5:
+    # Calculate lockout remaining time
+    last_fail = LoginAttempt.query.filter(...).order_by(desc).first()
+    elapsed = (datetime.utcnow() - last_fail.created_at).total_seconds()
+    remaining = 60 - elapsed
+```
+
+---
+
+## 6. SECURITY MECHANISMS
+
+### 6.1 Security Layers
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Layer 1: Transport Security                            │
+│  - Session cookies (HttpOnly, SameSite=Lax)             │
+│  - CSRF protection via Flask-WTF                        │
+└─────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│  Layer 2: Authentication                                │
+│  - bcrypt password hashing (12 rounds)                  │
+│  - Rate limiting (5 attempts / 5 minutes)               │
+│  - Account lockout (60 seconds)                         │
+│  - Login attempt logging                                │
+└─────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│  Layer 3: Key Exchange                                  │
+│  - Diffie-Hellman 2048-bit                              │
+│  - HKDF key derivation                                  │
+│  - Session key caching                                  │
+└─────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│  Layer 4: Message Encryption                            │
+│  - AES-256 CBC mode                                     │
+│  - Random IV per message                                │
+│  - PKCS#7 padding                                       │
+└─────────────────────────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────┐
+│  Layer 5: Message Integrity                             │
+│  - HMAC-SHA256 authentication                           │
+│  - Authenticate-then-decrypt pattern                    │
+│  - Constant-time comparison                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.2 Attack Mitigations
+
+| Attack Type | Mitigation | Implementation |
+|------------|-----------|----------------|
+| Brute Force Password | bcrypt slow hashing | 12 rounds = 4096 iterations |
+| Dictionary Attack | Rate limiting | 5 attempts / 5 min lockout |
+| SQL Injection | SQLAlchemy ORM | Parameterized queries |
+| XSS | Template escaping | Jinja2 auto-escape |
+| CSRF | SameSite cookies | config.py settings |
+| Session Hijacking | HttpOnly cookies | Prevents JS access |
+| Message Tampering | HMAC verification | SHA-256 integrity check |
+| Replay Attacks | Unique IV per message | Random 16-byte IV |
+| Timing Attacks | Constant-time comparison | hmac.compare_digest() |
+| Rainbow Tables | Random salt | bcrypt auto-salt |
+
+---
+
+## 7. COMPLETE FLOW SUMMARY
+
+### Registration → Login → Chat Flow
+
+```
+1. USER REGISTRATION
+   ├─ User fills form (username, password)
+   ├─ Backend validates input
+   ├─ Password hashed with bcrypt (12 rounds)
+   ├─ DH key pair generated (2048-bit)
+   ├─ User saved to database
+   └─ Redirect to login
+
+2. USER LOGIN
+   ├─ User enters credentials
+   ├─ Backend checks rate limiting
+   ├─ Password verified with bcrypt
+   ├─ Flask session created (user_id stored)
+   ├─ Login attempt logged
+   └─ Redirect to chat list
+
+3. SELECT CHAT PARTNER
+   ├─ User clicks on chat partner
+   ├─ Backend fetches both users' DH keys
+   ├─ Shared secret computed: peer_public^my_private mod P
+   ├─ AES-256 key derived with HKDF
+   ├─ Key cached in session
+   └─ Chat interface loaded
+
+4. SEND MESSAGE
+   ├─ User types message and clicks send
+   ├─ Frontend sends AJAX POST to /send_message
+   ├─ Backend retrieves shared key from session
+   ├─ Message encrypted:
+   │  ├─ Random IV generated (16 bytes)
+   │  ├─ Plaintext padded (PKCS#7)
+   │  ├─ AES-256 CBC encryption
+   │  └─ HMAC-SHA256 tag generated
+   ├─ Encrypted payload saved to database (Base64)
+   └─ Frontend refreshes messages
+
+5. RECEIVE MESSAGES
+   ├─ JavaScript polls /get_messages every 2 seconds
+   ├─ Backend fetches messages from database
+   ├─ For each message:
+   │  ├─ Base64 decode
+   │  ├─ HMAC verification (integrity check)
+   │  ├─ AES-256 CBC decryption
+   │  └─ PKCS#7 unpadding
+   ├─ Decrypted messages returned as JSON
+   └─ Frontend renders chat bubbles
+```
+
+---
+
+## 8. FILE CONNECTIONS MAP
+
+```
+app.py (Main Application)
+├─ Imports crypto/encryption.py
+│  └─ Uses: encrypt(), decrypt(), EncryptedPayload
+├─ Imports crypto/hashing.py
+│  └─ Uses: hash_password(), verify_password()
+├─ Imports crypto/key_exchange.py
+│  └─ Uses: generate_key_pair(), compute_shared_key()
+├─ Imports crypto/utils.py
+│  └─ Uses: encode_bytes(), decode_bytes(), generate_hmac(), verify_hmac()
+├─ Imports database/models.py
+│  └─ Uses: User, Message, LoginAttempt, BruteForceLog
+├─ Imports config.py
+│  └─ Uses: Config class (SECRET_KEY, DATABASE_URI, etc.)
+└─ Renders templates/*.html
+   └─ Templates use static/js/chat.js and static/css/main.css
+
+crypto/encryption.py
+├─ Imports crypto/utils.py
+│  └─ Uses: generate_hmac(), verify_hmac(), encode_bytes(), decode_bytes()
+└─ Uses: Crypto.Cipher.AES, Crypto.Random
+
+crypto/key_exchange.py
+├─ Imports crypto/utils.py
+│  └─ Uses: hkdf_sha256()
+└─ Uses: secrets module
+
+database/models.py
+├─ Imports database/__init__.py
+│  └─ Uses: db (SQLAlchemy instance)
+└─ Defines: User, Message, LoginAttempt, BruteForceLog
+
+templates/chat.html
+├─ Extends: templates/base.html
+└─ Includes: static/js/chat.js
+
+static/js/chat.js
+└─ Makes AJAX calls to:
+   ├─ GET /get_messages/<username>
+   └─ POST /send_message
+```
+
+---
+
+## 9. TECHNOLOGY STACK DETAILS
+
+**Backend:**
+- Flask 3.0.3: Web framework, routing, session management
+- SQLAlchemy: ORM for database operations
+- SQLite: Relational database storage
+- bcrypt 4.2.0: Password hashing algorithm
+- pycryptodome 3.20.0: AES encryption, HMAC, random number generation
+
+**Frontend:**
+- Bootstrap: Responsive UI framework
+- JavaScript (ES6): AJAX polling, DOM manipulation
+- Jinja2: Server-side templating
+- HTML5/CSS3: Structure and styling
+
+**Security:**
+- Flask-WTF: CSRF protection
+- python-dotenv: Environment variable management
+- secrets: Cryptographically secure random numbers
+
+---
+
+## 10. CONCLUSION
+
+This secure chat application demonstrates a complete implementation of end-to-end encryption with the following highlights:
+
+✅ **Strong Cryptography**: AES-256, DH-2048, bcrypt, HMAC-SHA256
+✅ **Secure Architecture**: Layered security, defense in depth
+✅ **Complete Flow**: Registration → Authentication → Key Exchange → Encrypted Messaging
+✅ **Audit Trail**: Login attempts, brute force logs
+✅ **Educational Value**: Clear code structure, comprehensive documentation
+
+**Key Takeaways:**
+1. Messages are NEVER stored in plaintext
+2. Each message has unique IV (prevents pattern analysis)
+3. HMAC verification prevents tampering
+4. bcrypt prevents brute force password attacks
+5. Rate limiting prevents credential stuffing
+6. Diffie-Hellman enables secure key exchange without pre-shared secrets
+
+This documentation provides a complete understanding of how the system works from user interaction to database storage, with detailed explanations of every security mechanism.
