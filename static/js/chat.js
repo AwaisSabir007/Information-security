@@ -11,6 +11,34 @@
   const attachBtn = document.getElementById("attach-btn");
   const fileInput = document.getElementById("image-upload");
 
+  function renderTimer(wrapper, expiresAt) {
+    if (!expiresAt) return;
+
+    const timerDisplay = document.createElement("span");
+    timerDisplay.className = "text-xs font-mono font-bold text-red-500 ml-2";
+    wrapper.appendChild(timerDisplay);
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const end = new Date(expiresAt);
+      const diff = Math.max(0, Math.ceil((end - now) / 1000));
+
+      if (diff <= 0) {
+        clearInterval(interval);
+        timerDisplay.textContent = "💥 Gone";
+        setTimeout(() => wrapper.remove(), 1000); // Remove bubble
+      } else {
+        timerDisplay.textContent = `🔥 ${diff}s`;
+      }
+    }, 1000);
+
+    // Init immediately
+    const now = new Date();
+    const end = new Date(expiresAt);
+    const diff = Math.max(0, Math.ceil((end - now) / 1000));
+    timerDisplay.textContent = `🔥 ${diff}s`;
+  }
+
   function buildMessageBubble(msg) {
     const isSelf = msg.sender === window.chatConfig.currentUser;
     const wrapper = document.createElement("div");
@@ -42,8 +70,13 @@
     }
 
     const timestamp = document.createElement("p");
-    timestamp.className = "text-gray-500 dark:text-gray-400 text-xs";
+    timestamp.className = "text-gray-500 dark:text-gray-400 text-xs flex items-center gap-1";
     timestamp.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    // Add Timer if exists
+    if (msg.expires_at) {
+      renderTimer(timestamp, msg.expires_at);
+    }
 
     if (isSelf) {
       textWrapper.appendChild(contentElement);
@@ -107,9 +140,14 @@
     evt.preventDefault();
     const data = new FormData(form);
 
+    // Get TTL
+    const ttlSelect = document.getElementById("ttl-select");
+    const ttl = ttlSelect ? ttlSelect.value : 0;
+
     const payload = {
       receiver: data.get("receiver"),
-      message: data.get("message")
+      message: data.get("message"),
+      ttl: ttl
     };
 
     // If file is selected (logichandled via separate listener, but if we wanted to merge...)

@@ -44,6 +44,7 @@ class Message(db.Model):
     iv = db.Column(db.Text, nullable=False)
     hmac = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
 
     sender_user = db.relationship("User", foreign_keys=[sender_id], back_populates="messages_sent")
     receiver_user = db.relationship("User", foreign_keys=[receiver_id], back_populates="messages_received")

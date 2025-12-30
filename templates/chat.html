@@ -181,6 +181,16 @@
             </button>
 
             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <!-- Timer Dropdown -->
+              <select id="ttl-select"
+                class="form-select pl-2 pr-6 py-1 text-xs rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 focus:ring-primary focus:border-primary cursor-pointer"
+                title="Self-Destruct Timer">
+                <option value="0" selected>⏱️ Off</option>
+                <option value="10">🔥 10s</option>
+                <option value="30">🔥 30s</option>
+                <option value="60">🔥 1m</option>
+              </select>
+
               <button type="submit"
                 class="w-10 h-10 flex items-center justify-center bg-primary text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm">
                 <span class="material-symbols-outlined">send</span>
