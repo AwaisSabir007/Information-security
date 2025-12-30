@@ -8,6 +8,9 @@
 
   let lastCount = 0;
 
+  const attachBtn = document.getElementById("attach-btn");
+  const fileInput = document.getElementById("image-upload");
+
   function buildMessageBubble(msg) {
     const isSelf = msg.sender === window.chatConfig.currentUser;
     const wrapper = document.createElement("div");
@@ -20,23 +23,35 @@
     const textWrapper = document.createElement("div");
     textWrapper.className = `flex flex-col gap-1 max-w-2xl ${isSelf ? "items-end" : "items-start"}`;
 
-    const bubble = document.createElement("p");
-    bubble.className = `text-base leading-relaxed rounded-3xl px-4 py-3 shadow-sm max-w-full ${
-      isSelf ? "rounded-br-none bg-primary text-white" : "rounded-bl-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-    }`;
-    bubble.textContent = msg.content;
+    // Helper to render content
+    let contentElement;
+    if (msg.content.startsWith("[IMAGE]:")) {
+      const base64Data = msg.content.substring(8); // Remove prefix
+      contentElement = document.createElement("img");
+      contentElement.src = base64Data;
+      contentElement.className = "rounded-lg shadow-md max-w-xs border border-gray-200 dark:border-gray-700 cursor-pointer hover:opacity-90 transition";
+      contentElement.onclick = () => {
+        const win = window.open();
+        win.document.write(`<img src="${base64Data}" style="max-width:100%">`);
+      };
+    } else {
+      contentElement = document.createElement("p");
+      contentElement.className = `text-base leading-relaxed rounded-3xl px-4 py-3 shadow-sm max-w-full ${isSelf ? "rounded-br-none bg-primary text-white" : "rounded-bl-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        }`;
+      contentElement.textContent = msg.content;
+    }
 
     const timestamp = document.createElement("p");
     timestamp.className = "text-gray-500 dark:text-gray-400 text-xs";
     timestamp.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     if (isSelf) {
-      textWrapper.appendChild(bubble);
+      textWrapper.appendChild(contentElement);
       textWrapper.appendChild(timestamp);
       wrapper.appendChild(textWrapper);
       wrapper.appendChild(avatar);
     } else {
-      textWrapper.appendChild(bubble);
+      textWrapper.appendChild(contentElement);
       textWrapper.appendChild(timestamp);
       wrapper.appendChild(avatar);
       wrapper.appendChild(textWrapper);
@@ -44,6 +59,8 @@
 
     return wrapper;
   }
+
+  // ... (buildDateSeparator logic) ...
 
   function buildDateSeparator(date) {
     const separator = document.createElement("div");
@@ -89,10 +106,15 @@
   async function sendMessage(evt) {
     evt.preventDefault();
     const data = new FormData(form);
+
     const payload = {
       receiver: data.get("receiver"),
       message: data.get("message")
     };
+
+    // If file is selected (logichandled via separate listener, but if we wanted to merge...)
+    // Actually, let's keep text sending simple here.
+
     const response = await fetch("/send_message", {
       method: "POST",
       headers: {
@@ -107,6 +129,45 @@
       }
       fetchMessages();
     }
+  }
+
+  // Handle File Attachment
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        alert("File too large. Max 2MB.");
+        fileInput.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        const payload = {
+          receiver: window.chatConfig.receiver,
+          message: `[IMAGE]:${base64Data}`
+        };
+
+        const response = await fetch("/send_message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          fileInput.value = ""; // Reset
+          fetchMessages();
+        } else {
+          alert("Failed to send image.");
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   form.addEventListener("submit", sendMessage);
