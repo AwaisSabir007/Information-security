@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Steganography Lab{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12 text-center">
+        <h1 class="display-4"><i class="bi bi-image"></i> Steganography Lab</h1>
+        <p class="lead">Hide secret messages inside innocent-looking images.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Encode Section -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title h5 mb-0"><i class="bi bi-lock-fill"></i> Hide Message (Encode)</h3>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('steganography') }}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="encode">
+
+                    <div class="mb-3">
+                        <label for="image_file" class="form-label">1. Upload Source Image (PNG/JPG)</label>
+                        <input class="form-control" type="file" id="image_file" name="image" accept="image/*" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="message" class="form-label">2. Enter Secret Message</label>
+                        <textarea class="form-control" id="message" name="message" rows="3"
+                            placeholder="Top secret info..." required></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-magic"></i> Embed Message & Download Image
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decode Section -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-success">
+            <div class="card-header bg-success text-white">
+                <h3 class="card-title h5 mb-0"><i class="bi bi-unlock-fill"></i> Reveal Message (Decode)</h3>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('steganography') }}" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="decode">
+
+                    <div class="mb-3">
+                        <label for="stego_image" class="form-label">1. Upload Image with Hidden Message</label>
+                        <input class="form-control" type="file" id="stego_image" name="image" accept="image/*" required>
+                    </div>
+
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-search"></i> Scan Image for Secrets
+                        </button>
+                    </div>
+
+                    {% if decoded_message %}
+                    <div class="alert alert-success mt-3" role="alert">
+                        <h4 class="alert-heading">Secret Found!</h4>
+                        <p class="mb-0 font-monospace">{{ decoded_message }}</p>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5><i class="bi bi-info-circle"></i> How it works</h5>
+                <p class="mb-0">
+                    This tool uses <strong>Least Significant Bit (LSB)</strong> steganography.
+                    It converts your text into binary (0s and 1s) and hides these bits in the smallest color value of
+                    each pixel in the image.
+                    The change is so subtle that the human eye cannot detect any difference in the image colors.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

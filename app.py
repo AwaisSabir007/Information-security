@@ -16,6 +16,7 @@ from flask import (
     session,
     url_for,
     flash,
+    send_file,
 )
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
@@ -422,6 +423,55 @@ def register_routes(app: Flask) -> None:
             })
             
         return jsonify(packet_data)
+
+
+    @app.route("/steganography", methods=["GET", "POST"])
+    @login_required
+    def steganography():
+        decoded_message = None
+        if request.method == "POST":
+            action = request.form.get("action")
+            file = request.files.get("image")
+            
+            if not file or not file.filename:
+                flash("No file selected.", "warning")
+                return redirect(url_for("steganography"))
+
+            try:
+                from crypto import steganography as stego
+                import io
+
+                if action == "encode":
+                    message = request.form.get("message", "")
+                    if not message:
+                        flash("Please enter a message to hide.", "warning")
+                        return redirect(url_for("steganography"))
+                    
+                    # Process image
+                    img_io = io.BytesIO(file.read())
+                    encoded_image = stego.encode_image(img_io, message)
+                    
+                    # Save to buffer
+                    output = io.BytesIO()
+                    encoded_image.save(output, format="PNG")
+                    output.seek(0)
+                    
+                    return send_file(
+                        output,
+                        mimetype="image/png",
+                        as_attachment=True,
+                        download_name="secret_image.png"
+                    )
+
+                elif action == "decode":
+                    img_io = io.BytesIO(file.read())
+                    decoded_message = stego.decode_image(img_io)
+                    flash("Image successfully scanned.", "success")
+            
+            except Exception as e:
+                flash(f"Error processing image: {str(e)}", "danger")
+
+        return render_template("steganography.html", decoded_message=decoded_message)
 
 
 def _mini_aes_key(key: int) -> bytes:
