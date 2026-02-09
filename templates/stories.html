@@ -1,0 +1,129 @@
+{% extends "base_new.html" %}
+
+{% block title %}Stories - Secure Chat{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white font-heading">Stories</h1>
+        <button onclick="document.getElementById('upload-modal').classList.remove('hidden')"
+            class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-transform hover:scale-105 shadow-lg shadow-pink-500/25">
+            <span class="material-symbols-outlined">add_circle</span>
+            Add Story
+        </button>
+    </div>
+
+    <!-- Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div
+        class="mb-6 p-4 rounded-xl border {% if category == 'success' %}bg-green-50 border-green-200 text-green-700{% else %}bg-red-50 border-red-200 text-red-700{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Stories Grid/Carousel -->
+    {% if stories %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for story in stories %}
+        <div class="relative group rounded-2xl overflow-hidden aspect-[9/16] shadow-xl bg-gray-900">
+            <img src="{{ url_for('static', filename='uploads/' + story.content_filename) }}"
+                alt="Story by {{ story.user.username }}"
+                class="w-full h-full object-cover opacity-90 transition-opacity group-hover:opacity-100">
+
+            <div
+                class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/60 opacity-100 transition-opacity">
+                <!-- Header -->
+                <div class="absolute top-0 left-0 right-0 p-4 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full border-2 border-pink-500 p-0.5 bg-black">
+                        {% if story.user.profile_picture %}
+                        <img src="{{ url_for('static', filename='uploads/' + story.user.profile_picture) }}"
+                            class="w-full h-full rounded-full object-cover">
+                        {% else %}
+                        <div
+                            class="w-full h-full rounded-full bg-primary/20 flex items-center justify-center text-[10px] text-white font-bold">
+                            {{ story.user.username[:2] }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-white text-sm font-semibold shadow-black drop-shadow-md">{{
+                            story.user.username }}</span>
+                        <span class="text-gray-300 text-xs">{{ story.created_at.strftime('%H:%M') }}</span>
+                    </div>
+                </div>
+
+                <!-- Caption -->
+                {% if story.caption %}
+                <div class="absolute bottom-0 left-0 right-0 p-4">
+                    <p class="text-white text-sm bg-black/40 backdrop-blur-sm p-2 rounded-lg inline-block">
+                        {{ story.caption }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div
+        class="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-pink-100 text-pink-500 mb-4">
+            <span class="material-symbols-outlined text-3xl">amp_stories</span>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No stories yet</h3>
+        <p class="text-gray-500 mt-1">Share a photo with your contacts to get started!</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        onclick="this.parentElement.classList.add('hidden')"></div>
+
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div
+                class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                <form action="{{ url_for('add_story') }}" method="POST" enctype="multipart/form-data">
+                    <div class="px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <h3 class="text-xl font-semibold leading-6 text-gray-900 dark:text-white mb-4" id="modal-title">
+                            Add to Story</h3>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Photo</label>
+                                <input type="file" name="story_image" accept="image/*" required class="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-pink-50 file:text-pink-700
+                              hover:file:bg-pink-100">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Caption
+                                    (Optional)</label>
+                                <input type="text" name="caption" maxlength="200"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2.5 focus:ring-pink-500 focus:border-pink-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="submit"
+                            class="inline-flex w-full justify-center rounded-lg bg-pink-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-pink-500 sm:ml-3 sm:w-auto">Share</button>
+                        <button type="button" onclick="document.getElementById('upload-modal').classList.add('hidden')"
+                            class="mt-3 inline-flex w-full justify-center rounded-lg bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %}HACKER VIEW - NETWORK SNIFFER{% endblock %}
 
@@ -46,10 +46,23 @@
         animation: fadeIn 0.3s ease-in;
     }
 
-    .timestamp { color: #888; margin-right: 10px; }
-    .ip { color: #00ccff; }
-    .encrypted { color: #ff3333; word-break: break-all; }
-    .meta { color: #ffff00; }
+    .timestamp {
+        color: #888;
+        margin-right: 10px;
+    }
+
+    .ip {
+        color: #00ccff;
+    }
+
+    .encrypted {
+        color: #ff3333;
+        word-break: break-all;
+    }
+
+    .meta {
+        color: #ffff00;
+    }
 
     /* Matrix Animation Background */
     #matrix-bg {
@@ -65,8 +78,15 @@
 
     /* Data Stream Animation */
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateX(-20px); }
-        to { opacity: 1; transform: translateX(0); }
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
 
     .blinking-cursor::after {
@@ -75,7 +95,9 @@
     }
 
     @keyframes blink {
-        50% { opacity: 0; }
+        50% {
+            opacity: 0;
+        }
     }
 
     .status-badge {
@@ -129,7 +151,8 @@
                 <hr style="border-color: #00ff41;">
                 <p class="small text-muted">Analyzing handshake protocols...</p>
                 <div class="progress" style="height: 5px; background-color: #003300;">
-                    <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                    <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 100%">
+                    </div>
                 </div>
             </div>
         </div>
@@ -161,27 +184,27 @@
     const characters = katakana.split('');
 
     const fontSize = 16;
-    const columns = canvas.width/fontSize;
+    const columns = canvas.width / fontSize;
 
     const drops = [];
-    for(let x = 0; x < columns; x++){
+    for (let x = 0; x < columns; x++) {
         drops[x] = 1;
     }
 
     function draw() {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         ctx.fillStyle = '#0F0';
         ctx.font = fontSize + 'px arial';
 
-        for(let i = 0; i < drops.length; i++) {
-            const text = characters[Math.floor(Math.random()*characters.length)];
-            ctx.fillText(text, i*fontSize, drops[i]*fontSize);
-            
-            if(drops[i]*fontSize > canvas.height && Math.random() > 0.975)
+        for (let i = 0; i < drops.length; i++) {
+            const text = characters[Math.floor(Math.random() * characters.length)];
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975)
                 drops[i] = 0;
-            
+
             drops[i]++;
         }
     }
@@ -198,17 +221,17 @@
                 if (data.length > 0) {
                     // Filter for new packets
                     const newPackets = data.filter(p => p.id > lastId);
-                    
+
                     if (newPackets.length > 0) {
                         // If it's the first load, just set the lastId
                         if (lastId === 0) {
                             terminal.innerHTML = ''; // Clear "Waiting..." message
                         }
-                        
+
                         // Process new packets (reverse to show oldest first if multiple come in)
                         newPackets.reverse().forEach(packet => {
                             lastId = Math.max(lastId, packet.id);
-                            
+
                             const entry = document.createElement('div');
                             entry.className = 'log-entry';
                             entry.innerHTML = `
@@ -218,9 +241,9 @@
                                 <div>Payload: <span class="encrypted">${packet.encrypted_payload}</span></div>
                                 <div class="small text-muted">IV: ${packet.iv.substring(0, 20)}... | HMAC: ${packet.hmac.substring(0, 20)}...</div>
                             `;
-                            
+
                             terminal.appendChild(entry);
-                            
+
                             // Auto-scroll to bottom
                             terminal.scrollTop = terminal.scrollHeight;
                         });

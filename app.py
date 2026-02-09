@@ -36,7 +36,7 @@ from config import Config
 from crypto import encryption, hashing, key_exchange, utils
 from crypto.encryption import EncryptedPayload
 from database import db
-from database.models import BruteForceLog, LoginAttempt, Message, User
+from database.models import BruteForceLog, LoginAttempt, Message, User, Story
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -600,6 +600,66 @@ def register_routes(app: Flask) -> None:
             form.bio.data = user.bio
 
         return render_template("profile.html", form=form, user=user)
+
+
+    @app.route("/stories")
+    @login_required
+    def stories():
+        # Clean up expired stories
+        now = datetime.utcnow()
+        Story.query.filter(Story.expires_at < now).delete()
+        db.session.commit()
+
+        # Fetch active stories (own + all users for now, ideally just contacts)
+        # For this demo, we show all active stories from all users
+        active_stories = Story.query.filter(Story.expires_at >= now).order_by(Story.created_at.desc()).all()
+        
+        return render_template("stories.html", stories=active_stories)
+
+    @app.route("/stories/add", methods=["POST"])
+    @login_required
+    def add_story():
+        if 'story_image' not in request.files:
+            flash("No image uploaded", "danger")
+            return redirect(url_for('stories'))
+            
+        file = request.files['story_image']
+        caption = request.form.get("caption", "").strip()[:200]
+        
+        if file.filename == '':
+            flash("No image selected", "danger")
+            return redirect(url_for('stories'))
+            
+        if file:
+            filename = secure_filename(f"story_{current_user().id}_{int(time.time())}.{file.filename.split('.')[-1]}")
+            
+            # Ensure upload folder exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            
+            new_story = Story(
+                user_id=current_user().id,
+                content_filename=filename,
+                caption=caption,
+                expires_at=datetime.utcnow() + timedelta(hours=24)
+            )
+            db.session.add(new_story)
+            db.session.commit()
+            
+            flash("Story added!", "success")
+            
+        return redirect(url_for('stories'))
+
+
+    # Context processors for template data
+    @app.context_processor
+    def inject_global_data():
+        user = current_user()
+        active_stories_count = 0
+        if user:
+            now = datetime.utcnow()
+            active_stories_count = Story.query.filter(Story.expires_at >= now).count()
+        return dict(current_user=user, active_stories_count=active_stories_count)
 
 
 def _mini_aes_key(key: int) -> bytes:

@@ -73,3 +73,16 @@ class BruteForceLog(db.Model):
     result = db.Column(db.String(32), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
+
+class Story(db.Model):
+    __tablename__ = "stories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    content_filename = db.Column(db.String(120), nullable=False)
+    caption = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+
+    user = db.relationship("User", backref=db.backref("stories", lazy=True))
+
