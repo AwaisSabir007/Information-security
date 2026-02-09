@@ -15,6 +15,9 @@ class User(db.Model):
     password_hash = db.Column(db.LargeBinary(128), nullable=False)
     public_key = db.Column(db.Text, nullable=False)
     private_key = db.Column(db.Text, nullable=False)
+    totp_secret = db.Column(db.String(32), nullable=True)
+    profile_picture = db.Column(db.String(120), nullable=True)
+    bio = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     messages_sent = db.relationship(

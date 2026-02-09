@@ -28,6 +28,9 @@ class Config:
     LOGIN_LOCKOUT_THRESHOLD = int(os.getenv("LOGIN_LOCKOUT_THRESHOLD", "5"))
     LOGIN_LOCKOUT_DURATION_SECONDS = int(os.getenv("LOGIN_LOCKOUT_DURATION_SECONDS", "60"))
     LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.getenv("LOGIN_ATTEMPT_WINDOW_MINUTES", "5"))
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2MB max upload size
+    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 
 class TestConfig(Config):

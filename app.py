@@ -4,9 +4,13 @@ import os
 import secrets
 import json
 import time
+import io
+import base64
 from datetime import datetime, timedelta
 from functools import wraps
 
+import pyotp
+import qrcode
 from Crypto.Cipher import AES as CryptoAES
 
 from flask import (
@@ -22,6 +26,11 @@ from flask import (
 )
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
+from werkzeug.utils import secure_filename
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed
+from wtforms import StringField, TextAreaField, FileField
+from wtforms.validators import DataRequired, Length, ValidationError
 
 from config import Config
 from crypto import encryption, hashing, key_exchange, utils
@@ -113,6 +122,19 @@ def get_shared_key_for_users(user_a: User, user_b: User) -> bytes:
     return shared_key
 
 
+class ProfileForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
+    bio = TextAreaField('Bio', validators=[Length(max=500)])
+    picture = FileField('Profile Picture', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif'], 'Images only!')])
+
+    def validate_username(self, username):
+        if username.data != current_user().username:
+            user = User.query.filter_by(username=username.data).first()
+            if user:
+                raise ValidationError('Username already exists.')
+
+
+
 def register_routes(app: Flask) -> None:
     @app.route("/")
     def index():
@@ -123,15 +145,17 @@ def register_routes(app: Flask) -> None:
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
-            username = request.form.get("username", "").strip()
-            password = request.form.get("password", "")
-            confirm_password = request.form.get("confirm_password", "")
+            username = request.form.get("username")
+            password = request.form.get("password")
+
             if not username or not password:
                 flash("Username and password are required.", "danger")
                 return redirect(url_for("register"))
-            if password != confirm_password:
-                flash("Passwords do not match.", "danger")
+
+            if User.query.filter_by(username=username).first():
+                flash("Username already exists.", "danger")
                 return redirect(url_for("register"))
+
             if len(password) < 8:
                 flash("Password must be at least 8 characters long.", "danger")
                 return redirect(url_for("register"))
@@ -143,26 +167,29 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("register"))
 
             hashed = hashing.hash_password(password)
+            
+            # Generate DH Keys
             key_pair = key_exchange.generate_key_pair()
-
-            user = User(
+            
+            new_user = User(
                 username=username,
                 password_hash=hashed,
-                public_key=str(key_pair.public_key),
-                private_key=str(key_pair.private_key),
+                private_key=str(key_pair.private_key), # Ensure keys are stored as strings
+                public_key=str(key_pair.public_key),   # Ensure keys are stored as strings
             )
-            db.session.add(user)
             try:
+                db.session.add(new_user)
                 db.session.commit()
+                
+                flash("Registration successful! Please login.", "success")
+                return redirect(url_for("login"))
+                
             except IntegrityError:
                 db.session.rollback()
-                flash("Username already exists.", "warning")
-                return redirect(url_for("register"))
-
-            flash("Registration successful. Please login.", "success")
-            return redirect(url_for("login"))
+                flash("Error creating account.", "danger")
 
         return render_template("register.html")
+
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -180,7 +207,16 @@ def register_routes(app: Flask) -> None:
 
             user = User.query.filter_by(username=username).first()
 
-            if not user or not hashing.verify_password(password, user.password_hash):
+            # Verify Password
+            if user and hashing.verify_password(password, user.password_hash):
+                # Success
+                session.clear() # Clear existing session to prevent session fixation
+                session["user_id"] = user.id
+                session["username"] = user.username
+                store_login_attempt(username, True, request.remote_addr)
+                flash("Login successful.", "success")
+                return redirect(url_for("chat_list"))
+            else:
                 store_login_attempt(username, False, request.remote_addr)
                 remaining = lockout_remaining_seconds(username, app)
                 if remaining > 0:
@@ -191,13 +227,6 @@ def register_routes(app: Flask) -> None:
                 else:
                     flash("Invalid credentials.", "danger")
                 return redirect(url_for("login"))
-
-            session.clear()
-            session["user_id"] = user.id
-            session["username"] = user.username
-            store_login_attempt(username, True, request.remote_addr)
-            flash("Logged in successfully.", "success")
-            return redirect(url_for("chat_list"))
 
         return render_template("login.html")
 
@@ -385,32 +414,53 @@ def register_routes(app: Flask) -> None:
         bit_size = int(request.form.get("bit_size", 16))
         max_key = 2**bit_size
 
-        actual_key = int(request.form.get("known_key", 42)) % max_key
+        # Randomly generate the key to find
+        actual_key = secrets.randbelow(max_key)
+        
         iv = b"\x00" * 16
         target_cipher = _mini_aes_encrypt(actual_key, plaintext.encode("utf-8"), iv)
 
         start = time.perf_counter()
         found_key = None
+        
+        # Hard limit of 2.0 seconds to prevent hanging
+        TIMEOUT = 2.0
+        
         for key_candidate in range(max_key):
+            # Check timeout every 1000 iterations to save partial CPU
+            if key_candidate % 1000 == 0:
+                if (time.perf_counter() - start) > TIMEOUT:
+                    break
+                    
             if _mini_aes_encrypt(key_candidate, plaintext.encode("utf-8"), iv) == target_cipher:
                 found_key = key_candidate
                 break
+                
         duration_ms = (time.perf_counter() - start) * 1000
 
+        result_status = "success" if found_key is not None else "timeout"
+        
         db.session.add(
             BruteForceLog(
                 attack_type="aes",
-                attempts=(found_key + 1) if found_key is not None else max_key,
+                attempts=(key_candidate + 1),
                 duration_ms=duration_ms,
-                result="success" if found_key is not None else "failure",
+                result=result_status,
             )
         )
         db.session.commit()
 
-        flash(
-            f"Simulated AES brute force complete. Key found: {found_key}, Time: {duration_ms:.2f}ms.",
-            "info",
-        )
+        if result_status == "success":
+            flash(
+                f"Simulated AES brute force complete. Key found: {found_key}, Time: {duration_ms:.2f}ms.",
+                "info",
+            )
+        else:
+             flash(
+                f"Attack FAILED! Timed out after {duration_ms:.2f}ms. The key space was too large to crack in time.",
+                "danger",
+            )
+            
         return redirect(url_for("brute_force_home"))
 
     @app.route("/admin/logs")
@@ -506,6 +556,50 @@ def register_routes(app: Flask) -> None:
                 flash(f"Error processing image: {str(e)}", "danger")
 
         return render_template("steganography.html", decoded_message=decoded_message)
+
+
+    @app.route("/profile", methods=["GET", "POST"])
+    @login_required
+    def profile():
+        form = ProfileForm()
+        user = current_user()
+
+        if form.validate_on_submit():
+            # Update Username
+            if form.username.data != user.username:
+                user.username = form.username.data
+                session["username"] = user.username # Update session
+            
+            # Update Bio
+            user.bio = form.bio.data
+
+            # Handle Profile Picture
+            if form.picture.data:
+                file = form.picture.data
+                filename = secure_filename(f"user_{user.id}_{file.filename}")
+                
+                # Ensure upload folder exists
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                
+                # Store relative path or filename
+                user.profile_picture = filename
+
+            try:
+                db.session.commit()
+                flash("Profile updated successfully.", "success")
+                return redirect(url_for("profile"))
+            except IntegrityError:
+                db.session.rollback()
+                flash("Error updating profile. Username might be taken.", "danger")
+
+        elif request.method == "GET":
+            form.username.data = user.username
+            form.bio.data = user.bio
+
+        return render_template("profile.html", form=form, user=user)
 
 
 def _mini_aes_key(key: int) -> bytes:
